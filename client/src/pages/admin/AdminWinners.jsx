@@ -18,11 +18,11 @@ export default function AdminWinners() {
   const fetchWinners = async () => {
     try {
       const { data, error } = await supabase
-        .from('draw_results')
+        .from('winner_verifications')
         .select(`
           *,
-          users(full_name, email),
-          draw_periods(title, draw_month)
+          profiles:user_id(full_name, email),
+          draw_periods:draw_period_id(title, draw_month)
         `)
         .order('created_at', { ascending: false })
         
@@ -42,8 +42,8 @@ export default function AdminWinners() {
     setProcessingId(id)
     try {
       const { error } = await supabase
-        .from('draw_results')
-        .update({ status: newStatus })
+        .from('winner_verifications')
+        .update({ status: newStatus, reviewed_at: new Date().toISOString() })
         .eq('id', id)
 
       if (error) throw error
@@ -57,7 +57,7 @@ export default function AdminWinners() {
   }
 
   const filteredWinners = winners.filter(w => 
-    w.users?.full_name?.toLowerCase().includes(search.toLowerCase()) || 
+    w.profiles?.full_name?.toLowerCase().includes(search.toLowerCase()) || 
     w.draw_periods?.title?.toLowerCase().includes(search.toLowerCase())
   )
 
@@ -110,21 +110,21 @@ export default function AdminWinners() {
                 filteredWinners.map(w => (
                   <tr key={w.id} className="hover:bg-white/[0.02] transition-colors">
                     <td className="px-6 py-4">
-                      <div className="font-bold text-white">{w.users?.full_name || 'Unknown User'}</div>
-                      <div className="text-white/40 text-xs mt-1">{w.users?.email}</div>
+                      <div className="font-bold text-white">{w.profiles?.full_name || 'Unknown User'}</div>
+                      <div className="text-white/40 text-xs mt-1">{w.profiles?.email}</div>
                     </td>
                     <td className="px-6 py-4 text-white/80">
                       {w.draw_periods?.title}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className="font-medium text-brand-400">{w.match_type} MATCH {w.is_jackpot ? '🌟' : ''}</span>
-                        <span className="text-white/80">${w.prize_amount?.toLocaleString() || '0'}</span>
+                        <span className="font-medium text-brand-400">{w.status?.toUpperCase()}</span>
+                        <span className="text-white/80">₹{w.prize_amount?.toLocaleString() || '0'}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      {w.verification_proof_url ? (
-                        <a href={w.verification_proof_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-accent-400 hover:text-accent-300">
+                      {w.proof_url ? (
+                        <a href={w.proof_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-accent-400 hover:text-accent-300">
                            View Proof <ExternalLink size={14} className="ml-1" />
                         </a>
                       ) : (
@@ -132,35 +132,36 @@ export default function AdminWinners() {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      {w.status === 'unverified' && <span className="text-white/40 bg-white/5 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider">Awaiting Proof</span>}
-                      {w.status === 'pending_verification' && <span className="text-accent-400 bg-accent-500/10 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider">Review Needed</span>}
-                      {w.status === 'verified_unpaid' && <span className="text-brand-400 bg-brand-500/10 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider">Verified (Unpaid)</span>}
+                      {w.status === 'pending' && !w.proof_url && <span className="text-white/40 bg-white/5 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider">Awaiting Proof</span>}
+                      {w.status === 'pending' && w.proof_url && <span className="text-accent-400 bg-accent-500/10 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider">Review Needed</span>}
+                      {w.status === 'approved' && <span className="text-brand-400 bg-brand-500/10 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider">Approved</span>}
+                      {w.status === 'rejected' && <span className="text-red-400 bg-red-500/10 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider">Rejected</span>}
                       {w.status === 'paid' && <span className="text-dark-950 bg-brand-500 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider">Paid</span>}
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
-                       {w.status === 'pending_verification' && (
+                       {w.status === 'pending' && w.proof_url && (
                          <>
                            <Button 
                              size="sm" 
                              variant="primary" 
                              className="text-xs py-1.5 px-3"
-                             onClick={() => handleUpdateStatus(w.id, 'verified_unpaid')}
+                             onClick={() => handleUpdateStatus(w.id, 'approved')}
                              isLoading={processingId === w.id}
                            >
-                             Verify
+                             Approve
                            </Button>
                            <Button 
                              size="sm" 
                              variant="secondary" 
                              className="text-xs py-1.5 px-3 text-rose-400 border-rose-500/30 hover:bg-rose-500/10"
-                             onClick={() => handleUpdateStatus(w.id, 'unverified')}
+                             onClick={() => handleUpdateStatus(w.id, 'rejected')}
                              disabled={processingId === w.id}
                            >
-                             Reject Proof
+                             Reject
                            </Button>
                          </>
                        )}
-                       {w.status === 'verified_unpaid' && (
+                       {w.status === 'approved' && (
                          <Button 
                            size="sm" 
                            variant="accent" 

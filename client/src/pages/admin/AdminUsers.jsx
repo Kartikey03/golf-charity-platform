@@ -16,8 +16,8 @@ export default function AdminUsers() {
           .from('profiles')
           .select(`
             *,
-            charities(name),
-            subscriptions(status, plan_type)
+            charity_contributions(charity_id, percentage, charities(name)),
+            subscriptions(status, plan)
           `)
           .order('created_at', { ascending: false })
           .limit(100)
@@ -85,14 +85,15 @@ export default function AdminUsers() {
               ) : (
                 filteredUsers.map(u => {
                   const sub = u.subscriptions?.[0]
-                  const charityName = u.charities?.name || 'Unassigned'
+                  const charityName = u.charity_contributions?.[0]?.charities?.name || 'Unassigned'
+                  const charityPct = u.charity_contributions?.[0]?.percentage || 0
                   return (
                     <tr key={u.id} className="hover:bg-white/[0.02] transition-colors">
                       <td className="px-6 py-4 font-medium text-white">{u.full_name || 'Unnamed'}</td>
                       <td className="px-6 py-4">
                         {sub?.status === 'active' ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-brand-500/10 text-brand-400">
-                            Active ({sub.plan_type})
+                            Active ({sub.plan})
                           </span>
                         ) : (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white/10 text-white/60">
@@ -103,7 +104,7 @@ export default function AdminUsers() {
                       <td className="px-6 py-4">
                         <div className="flex flex-col">
                           <span>{charityName}</span>
-                          <span className="text-xs text-white/40">{u.charity_pct}% contribution</span>
+                          <span className="text-xs text-white/40">{charityPct}% contribution</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-white/60">

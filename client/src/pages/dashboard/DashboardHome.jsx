@@ -17,13 +17,25 @@ export default function DashboardHome() {
   const isJustSubscribed = searchParams.get('subscribed') === 'true'
 
   useEffect(() => {
-    if (isJustSubscribed) {
-      toast.success('Subscription successful! Welcome to the club.')
-    }
-    
-    async function fetchSubscription() {
+    async function initDashboard() {
+      const token = (await supabase.auth.getSession()).data.session?.access_token
+      if (!token) { setLoading(false); return }
+
+      // If returning from successful Stripe checkout, verify and sync the subscription
+      if (isJustSubscribed) {
+        toast.success('Subscription successful! Welcome to the club.')
+        try {
+          await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/subscription/verify`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` }
+          })
+        } catch (err) {
+          console.error('Subscription verify error:', err)
+        }
+      }
+
+      // Fetch subscription status
       try {
-        const token = (await supabase.auth.getSession()).data.session?.access_token
         const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/subscription/me`, {
           headers: { Authorization: `Bearer ${token}` }
         })
@@ -37,7 +49,7 @@ export default function DashboardHome() {
         setLoading(false)
       }
     }
-    fetchSubscription()
+    initDashboard()
   }, [isJustSubscribed])
 
   const handleCheckout = async (plan) => {

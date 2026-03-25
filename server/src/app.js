@@ -28,7 +28,7 @@ app.use(express.json())
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 200 }))
 
 app.use('/api/auth', authRoutes)
-app.use('/api/subscriptions', subscriptionRoutes)
+app.use('/api/subscription', subscriptionRoutes)
 app.use('/api/scores', scoresRoutes)
 app.use('/api/draws', drawRoutes)
 app.use('/api/charities', charityRoutes)

@@ -7,6 +7,8 @@ import toast from 'react-hot-toast'
 import { Heart, Search, DollarSign } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+
 export default function CharityPage() {
   const { user, profile, refetchProfile } = useAuth()
   const [charities, setCharities] = useState([])
@@ -15,44 +17,82 @@ export default function CharityPage() {
   const [search, setSearch] = useState('')
 
   const [formData, setFormData] = useState({
-    charityId: profile?.charity_id || '',
-    charityPct: profile?.charity_pct || 10
+    charityId: '',
+    charityPct: 10
   })
+
+  const getToken = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.access_token
+  }
 
   useEffect(() => {
     async function init() {
-      const { data } = await supabase.from('charities').select('*').eq('status', 'active').order('name')
-      if (data) setCharities(data)
-      
-      // Initialize if populated after render
-      if (profile) {
-        setFormData({
-          charityId: profile.charity_id || (data && data[0]?.id) || '',
-          charityPct: profile.charity_pct || 10
-        })
+      try {
+        const token = await getToken()
+        
+        // Fetch charities via backend API
+        const charitiesRes = await fetch(`${API_URL}/api/charities`)
+        const charitiesData = charitiesRes.ok ? await charitiesRes.json() : []
+        setCharities(charitiesData)
+        
+        // Fetch current user's contribution via backend API
+        if (token) {
+          const contribRes = await fetch(`${API_URL}/api/charities/contribution`, {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+          const contrib = contribRes.ok ? await contribRes.json() : null
+          
+          if (contrib) {
+            setFormData({
+              charityId: contrib.charity_id || (charitiesData[0]?.id) || '',
+              charityPct: contrib.percentage || 10
+            })
+          } else {
+            setFormData({
+              charityId: (charitiesData[0]?.id) || '',
+              charityPct: 10
+            })
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load charity data:', err)
       }
       setLoading(false)
     }
     init()
-  }, [profile])
+  }, [user])
 
   const handleUpdate = async () => {
     if (formData.charityPct < 10) return toast.error('Minimum contribution is 10%')
+    if (!formData.charityId) return toast.error('Please select a charity')
     
     setSaving(true)
-    const { error } = await supabase
-      .from('profiles')
-      .update({ 
-        charity_id: formData.charityId, 
-        charity_pct: formData.charityPct 
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/api/charities/contribution`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          charity_id: formData.charityId,
+          percentage: formData.charityPct
+        })
       })
-      .eq('id', user.id)
 
-    if (error) {
+      if (!res.ok) {
+        const err = await res.json()
+        console.error('Charity update error:', err)
+        toast.error('Failed to update preferences')
+      } else {
+        toast.success('Charity impact preferences saved!')
+        refetchProfile()
+      }
+    } catch (err) {
+      console.error('Charity update error:', err)
       toast.error('Failed to update preferences')
-    } else {
-      toast.success('Charity impact preferences saved!')
-      refetchProfile()
     }
     setSaving(false)
   }

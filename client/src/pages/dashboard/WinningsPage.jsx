@@ -18,17 +18,17 @@ export default function WinningsPage() {
 
   const fetchWinnings = async () => {
     try {
-      const { data, error } = await supabase
-        .from('draw_results')
-        .select(`
-          *,
-          draw_period:draw_periods(title, draw_month)
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+      const token = (await supabase.auth.getSession()).data.session?.access_token
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/winners/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
       
-      if (error) throw error
-      setWinnings(data || [])
+      if (res.ok) {
+        const data = await res.json()
+        setWinnings(data || [])
+      } else {
+        console.error('Failed to fetch winnings')
+      }
     } catch (err) {
       console.error('Error fetching winnings:', err)
       toast.error('Failed to load winnings')
@@ -65,12 +65,13 @@ export default function WinningsPage() {
         .from('verifications')
         .getPublicUrl(filePath)
 
-      // Update draw_result record
+      // Update winner_verifications record
       const { error: updateError } = await supabase
-        .from('draw_results')
+        .from('winner_verifications')
         .update({ 
-          verification_proof_url: publicUrl,
-          status: 'pending_verification'
+          proof_url: publicUrl,
+          status: 'pending',
+          submitted_at: new Date().toISOString()
         })
         .eq('id', resultId)
 
@@ -137,7 +138,7 @@ export default function WinningsPage() {
                   <div className="w-full md:w-auto min-w-[250px] bg-dark-900 border border-white/10 p-5 rounded-xl">
                     <div className="text-xs text-white/40 font-bold uppercase tracking-widest mb-3">Status</div>
                     
-                    {win.status === 'unverified' ? (
+                    {(!win.status || win.status === 'pending') && !win.proof_url ? (
                       <div className="space-y-3">
                         <div className="flex items-center text-rose-400 text-sm font-medium">
                           <Clock size={16} className="mr-2" /> Pending Verification
@@ -163,7 +164,7 @@ export default function WinningsPage() {
                           </Button>
                         </div>
                       </div>
-                    ) : win.status === 'pending_verification' ? (
+                    ) : win.status === 'pending' && win.proof_url ? (
                       <div className="space-y-3">
                         <div className="flex items-center text-accent-400 text-sm font-medium">
                           <Clock size={16} className="mr-2" /> Under Review
@@ -171,19 +172,28 @@ export default function WinningsPage() {
                         <p className="text-xs text-white/60 leading-relaxed">
                           Your scorecard has been uploaded and is currently being verified by our team.
                         </p>
-                        {win.verification_proof_url && (
-                          <a href={win.verification_proof_url} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-400 hover:text-brand-300 underline block mt-2">
+                        {win.proof_url && (
+                          <a href={win.proof_url} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-400 hover:text-brand-300 underline block mt-2">
                             View uploaded proof
                           </a>
                         )}
                       </div>
-                    ) : win.status === 'verified_unpaid' ? (
+                    ) : win.status === 'approved' ? (
                       <div className="space-y-3">
                         <div className="flex items-center text-brand-400 text-sm font-medium">
                           <CheckCircle2 size={16} className="mr-2" /> Verified
                         </div>
                         <p className="text-xs text-white/60 leading-relaxed">
                           Your scorecard is verified! The prize amount will be transferred to your account shortly.
+                        </p>
+                      </div>
+                    ) : win.status === 'rejected' ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center text-red-400 text-sm font-medium">
+                          <Clock size={16} className="mr-2" /> Rejected
+                        </div>
+                        <p className="text-xs text-white/60 leading-relaxed">
+                          Your scorecard verification was rejected. Please contact support.
                         </p>
                       </div>
                     ) : (

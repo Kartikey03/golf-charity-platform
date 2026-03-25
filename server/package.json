@@ -1,6 +1,7 @@
 {
   "name": "golf-charity-server",
   "version": "1.0.0",
+  "type": "module",
   "main": "src/app.js",
   "scripts": {
     "dev": "nodemon src/app.js",

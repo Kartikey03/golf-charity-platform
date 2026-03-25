@@ -1,11 +1,10 @@
 
-// =============================================
-// server/src/routes/scores.routes.js
-// =============================================
 import { Router } from 'express'
 import { authenticate } from '../middleware/auth.js'
 import { supabase } from '../config/supabase.js'
-import { SCORE_MIN, SCORE_MAX } from '../../../client/src/constants/index.js'
+
+const SCORE_MIN = 1
+const SCORE_MAX = 45
 
 const router = Router()
 

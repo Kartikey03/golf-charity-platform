@@ -1,7 +1,3 @@
-
-// =============================================
-// server/src/webhooks/stripe.webhook.js
-// =============================================
 import { stripe } from '../config/stripe.js'
 import { supabase } from '../config/supabase.js'
 
@@ -23,11 +19,12 @@ export async function stripeWebhook(req, res) {
 
       await supabase.from('subscriptions').upsert({
         user_id: userId,
-        plan,
+        plan: plan,
         status: 'active',
         stripe_customer_id: session.customer,
         stripe_subscription_id: session.subscription,
         amount_pence: session.amount_total,
+        currency: session.currency || 'inr',
         current_period_start: new Date().toISOString(),
         current_period_end: new Date(
           Date.now() + (plan === 'yearly' ? 365 : 30) * 86400000

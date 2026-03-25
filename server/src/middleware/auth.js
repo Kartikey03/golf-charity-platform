@@ -1,7 +1,4 @@
 
-// =============================================
-// server/src/middleware/auth.js
-// =============================================
 import { supabase } from '../config/supabase.js'
 
 export async function authenticate(req, res, next) {
@@ -11,7 +8,7 @@ export async function authenticate(req, res, next) {
   const { data: { user }, error } = await supabase.auth.getUser(token)
   if (error || !user) return res.status(401).json({ error: 'Invalid token' })
 
-  // Attach profile with role
+  // Attach profile with role from profiles table
   const { data: profile } = await supabase
     .from('profiles').select('*').eq('id', user.id).single()
 

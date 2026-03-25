@@ -43,16 +43,25 @@ export default function SettingsPage() {
     e.preventDefault()
     setLoading(true)
     
-    const { error } = await supabase
-      .from('profiles')
-      .update({ full_name: formData.fullName })
-      .eq('id', user.id)
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/profile`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ full_name: formData.fullName })
+      })
 
-    if (error) {
+      if (res.ok) {
+        toast.success('Profile updated successfully')
+        refetchProfile()
+      } else {
+        toast.error('Failed to update profile')
+      }
+    } catch (err) {
       toast.error('Failed to update profile')
-    } else {
-      toast.success('Profile updated successfully')
-      refetchProfile()
     }
     setLoading(false)
   }
@@ -184,7 +193,7 @@ export default function SettingsPage() {
                
                <div>
                  <div className="text-sm text-white/60 mb-1">Current Plan</div>
-                 <div className="text-lg font-bold text-white capitalize">{subscription?.plan_type || 'None'}</div>
+                 <div className="text-lg font-bold text-white capitalize">{subscription?.plan || 'None'}</div>
                </div>
 
                <div>

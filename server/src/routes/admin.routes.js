@@ -11,7 +11,7 @@ router.use(authenticate, adminOnly)
 router.get('/stats', async (req, res, next) => {
   try {
     // Basic example of gathering some stats
-    const { count: userCount } = await supabase.from('users').select('*', { count: 'exact', head: true })
+    const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true })
     const { count: subCount } = await supabase.from('subscriptions').select('*', { count: 'exact', head: true }).eq('status', 'active')
     
     res.json({
