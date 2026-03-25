@@ -7,9 +7,72 @@ import toast from 'react-hot-toast'
 import { Heart, Plus, Edit2, X, Star, StarOff } from 'lucide-react'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
-
 const emptyForm = { name: '', description: '', website_url: '', logo_url: '', is_featured: false }
 
+// ── Form — defined OUTSIDE component to prevent remount on every render ────────
+// This is critical: if FormFields were inside AdminCharities, React would
+// unmount/remount it on every state change, causing inputs to lose focus.
+function CharityForm({ formData, setFormData, onSubmit, onCancel, submitLabel, submitting }) {
+  return (
+    <form onSubmit={onSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Input
+          label="Organization Name"
+          value={formData.name}
+          onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+          required
+        />
+        <div>
+          <label className="block text-sm font-medium text-white/80 mb-1.5">Website URL (optional)</label>
+          <input
+            type="url"
+            className="input-field w-full"
+            value={formData.website_url}
+            onChange={e => setFormData(prev => ({ ...prev, website_url: e.target.value }))}
+            placeholder="https://..."
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-white/80 mb-1.5">Logo URL (optional)</label>
+          <input
+            type="url"
+            className="input-field w-full"
+            value={formData.logo_url}
+            onChange={e => setFormData(prev => ({ ...prev, logo_url: e.target.value }))}
+            placeholder="https://..."
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-white/80 mb-1.5">Description</label>
+          <textarea
+            className="input-field w-full min-h-[100px]"
+            value={formData.description}
+            onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+            required
+          />
+        </div>
+        <div className="md:col-span-2 flex items-center gap-3">
+          <input
+            type="checkbox"
+            id="is_featured_chk"
+            checked={formData.is_featured}
+            onChange={e => setFormData(prev => ({ ...prev, is_featured: e.target.checked }))}
+            className="w-4 h-4 accent-brand-500"
+          />
+          <label htmlFor="is_featured_chk" className="text-sm text-white/80 cursor-pointer">
+            Feature on homepage (spotlight charity)
+          </label>
+        </div>
+      </div>
+      <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+        <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button>
+        <Button type="submit" isLoading={submitting}>{submitLabel}</Button>
+      </div>
+    </form>
+  )
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────────
 export default function AdminCharities() {
   const [charities, setCharities] = useState([])
   const [loading, setLoading] = useState(true)
@@ -20,13 +83,15 @@ export default function AdminCharities() {
 
   useEffect(() => { fetchCharities() }, [])
 
+  const getToken = async () =>
+    (await supabase.auth.getSession()).data.session?.access_token
+
+  // Use backend API (not direct Supabase) to bypass RLS
   const fetchCharities = async () => {
     try {
-      const { data, error } = await supabase
-        .from('charities')
-        .select('*')
-        .order('name', { ascending: true })
-      if (error) throw error
+      const res = await fetch(`${API_URL}/api/charities`)
+      if (!res.ok) throw new Error('Failed to fetch')
+      const data = await res.json()
       setCharities(data || [])
     } catch {
       toast.error('Failed to load charities')
@@ -34,9 +99,6 @@ export default function AdminCharities() {
       setLoading(false)
     }
   }
-
-  const getToken = async () =>
-    (await supabase.auth.getSession()).data.session?.access_token
 
   const handleAdd = async (e) => {
     e.preventDefault()
@@ -69,14 +131,7 @@ export default function AdminCharities() {
       const res = await fetch(`${API_URL}/api/charities/${editingCharity.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          name: formData.name,
-          description: formData.description,
-          website_url: formData.website_url,
-          logo_url: formData.logo_url,
-          is_featured: formData.is_featured,
-          is_active: editingCharity.is_active,
-        }),
+        body: JSON.stringify({ ...formData, is_active: editingCharity.is_active }),
       })
       if (res.ok) {
         toast.success('Charity updated')
@@ -99,12 +154,8 @@ export default function AdminCharities() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ is_active: !charity.is_active }),
       })
-      if (res.ok) {
-        toast.success(`Charity ${action}d`)
-        fetchCharities()
-      } else {
-        toast.error(`Failed to ${action} charity`)
-      }
+      if (res.ok) { toast.success(`Charity ${action}d`); fetchCharities() }
+      else toast.error(`Failed to ${action} charity`)
     } catch { toast.error('Network error') }
   }
 
@@ -116,10 +167,7 @@ export default function AdminCharities() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ is_featured: !charity.is_featured }),
       })
-      if (res.ok) {
-        toast.success(charity.is_featured ? 'Removed from featured' : 'Marked as featured')
-        fetchCharities()
-      }
+      if (res.ok) { toast.success(charity.is_featured ? 'Removed from featured' : 'Marked as featured'); fetchCharities() }
     } catch { toast.error('Network error') }
   }
 
@@ -134,60 +182,6 @@ export default function AdminCharities() {
     })
     setShowAdd(false)
   }
-
-  const FormFields = ({ onSubmit, submitLabel }) => (
-    <form onSubmit={onSubmit} className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Input
-          label="Organization Name"
-          value={formData.name}
-          onChange={e => setFormData({ ...formData, name: e.target.value })}
-          required
-        />
-        <Input
-          label="Website URL"
-          type="url"
-          value={formData.website_url}
-          onChange={e => setFormData({ ...formData, website_url: e.target.value })}
-        />
-        <div className="md:col-span-2">
-          <Input
-            label="Logo URL"
-            type="url"
-            value={formData.logo_url}
-            onChange={e => setFormData({ ...formData, logo_url: e.target.value })}
-          />
-        </div>
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-white/80 mb-1.5">Description</label>
-          <textarea
-            className="w-full input-field min-h-[100px]"
-            value={formData.description}
-            onChange={e => setFormData({ ...formData, description: e.target.value })}
-            required
-          />
-        </div>
-        <div className="md:col-span-2 flex items-center gap-3">
-          <input
-            type="checkbox"
-            id="is_featured"
-            checked={formData.is_featured}
-            onChange={e => setFormData({ ...formData, is_featured: e.target.checked })}
-            className="w-4 h-4 accent-brand-500"
-          />
-          <label htmlFor="is_featured" className="text-sm text-white/80 cursor-pointer">
-            Feature on homepage (spotlight charity)
-          </label>
-        </div>
-      </div>
-      <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
-        <Button type="button" variant="secondary" onClick={() => { setShowAdd(false); setEditingCharity(null) }}>
-          Cancel
-        </Button>
-        <Button type="submit" isLoading={submitting}>{submitLabel}</Button>
-      </div>
-    </form>
-  )
 
   return (
     <div className="w-full h-full max-w-6xl mx-auto space-y-8 animate-fade-in">
@@ -207,7 +201,16 @@ export default function AdminCharities() {
       {showAdd && (
         <Card className="border-brand-500/30">
           <CardHeader><h2 className="text-xl font-bold text-white">Add New Charity</h2></CardHeader>
-          <CardBody><FormFields onSubmit={handleAdd} submitLabel="Save Charity" /></CardBody>
+          <CardBody>
+            <CharityForm
+              formData={formData}
+              setFormData={setFormData}
+              onSubmit={handleAdd}
+              onCancel={() => setShowAdd(false)}
+              submitLabel="Save Charity"
+              submitting={submitting}
+            />
+          </CardBody>
         </Card>
       )}
 
@@ -221,7 +224,16 @@ export default function AdminCharities() {
               </button>
             </div>
           </CardHeader>
-          <CardBody><FormFields onSubmit={handleEdit} submitLabel="Save Changes" /></CardBody>
+          <CardBody>
+            <CharityForm
+              formData={formData}
+              setFormData={setFormData}
+              onSubmit={handleEdit}
+              onCancel={() => setEditingCharity(null)}
+              submitLabel="Save Changes"
+              submitting={submitting}
+            />
+          </CardBody>
         </Card>
       )}
 
@@ -238,7 +250,7 @@ export default function AdminCharities() {
             </thead>
             <tbody className="divide-y divide-white/5">
               {loading ? (
-                <tr><td colSpan="4" className="px-6 py-8 text-center text-white/40 animate-pulse">Loading...</td></tr>
+                <tr><td colSpan="4" className="px-6 py-8 text-center text-white/40 animate-pulse">Loading charities...</td></tr>
               ) : charities.length === 0 ? (
                 <tr><td colSpan="4" className="px-6 py-8 text-center text-white/40">No charities found.</td></tr>
               ) : (
@@ -278,11 +290,7 @@ export default function AdminCharities() {
                       </button>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => openEdit(c)}
-                        className="text-white/40 hover:text-brand-400 transition-colors"
-                        title="Edit"
-                      >
+                      <button onClick={() => openEdit(c)} className="text-white/40 hover:text-brand-400 transition-colors" title="Edit">
                         <Edit2 size={16} />
                       </button>
                     </td>
