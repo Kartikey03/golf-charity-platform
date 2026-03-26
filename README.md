@@ -9,8 +9,8 @@
 
 | Panel | URL |
 |-------|-----|
-| 🌐 Frontend (Vercel) | *(your Vercel deployment URL)* |
-| 🔧 Backend API (Vercel) | *(your backend Vercel deployment URL)* |
+| 🌐 Frontend (Vercel) | *https://golf-charity-platform-i2fo-dtnit7u3k.vercel.app/* |
+| 🔧 Backend API (Vercel) | *https://golf-charity-platform-ashen-tau.vercel.app/* |
 
 ---
 
@@ -133,7 +133,7 @@ root/
 
 ### 1. Clone the Repo
 ```bash
-git clone https://github.com/your-username/golf-charity-platform.git
+git clone https://github.com/Kartikey03/golf-charity-platform.git
 cd golf-charity-platform
 ```
 
