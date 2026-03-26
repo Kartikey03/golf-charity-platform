@@ -367,6 +367,6 @@ The `api/index.js` entry exports the Express app as a serverless function. The `
 
 ## 📬 Contact
 
-Built by **Kartik** for the Digital Heroes Full-Stack Trainee Selection.
+Built by **Kartikey Sharma** for the Digital Heroes Full-Stack Trainee Selection.
 
 > For any queries about this submission, please reach out via the contact details provided in the application.
