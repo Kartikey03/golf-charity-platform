@@ -11,8 +11,37 @@ router.get('/', async (req, res, next) => {
       .from('charities')
       .select('*')
       .eq('is_active', true)
+      .order('name', { ascending: true })
     
     if (error) throw error
+    res.json(data)
+  } catch (err) { next(err) }
+})
+
+// Get single charity by slug or id (public)
+router.get('/:slug', async (req, res, next) => {
+  try {
+    const { slug } = req.params
+    // Try slug match first, fall back to id match
+    let { data } = await supabase
+      .from('charities')
+      .select('*')
+      .eq('slug', slug)
+      .eq('is_active', true)
+      .single()
+
+    // If not found by slug, try by UUID id
+    if (!data) {
+      const result = await supabase
+        .from('charities')
+        .select('*')
+        .eq('id', slug)
+        .eq('is_active', true)
+        .single()
+      data = result.data
+    }
+
+    if (!data) return res.status(404).json({ error: 'Charity not found' })
     res.json(data)
   } catch (err) { next(err) }
 })
@@ -32,13 +61,18 @@ router.post('/', authenticate, adminOnly, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
-// Admin: Toggle charity active status
+// Admin: Toggle charity active status / update any fields
 router.patch('/:id', authenticate, adminOnly, async (req, res, next) => {
   try {
-    const { is_active } = req.body
+    const allowed = ['is_active', 'is_featured', 'name', 'description', 'website_url', 'logo_url']
+    const updates = { updated_at: new Date().toISOString() }
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) updates[key] = req.body[key]
+    }
+
     const { data, error } = await supabase
       .from('charities')
-      .update({ is_active, updated_at: new Date().toISOString() })
+      .update(updates)
       .eq('id', req.params.id)
       .select()
       .single()

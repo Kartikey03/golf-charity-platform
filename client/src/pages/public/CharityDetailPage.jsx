@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
 import { ArrowLeft, ExternalLink, Heart } from 'lucide-react'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 export default function CharityDetailPage() {
   const { slug } = useParams()
@@ -10,15 +11,18 @@ export default function CharityDetailPage() {
 
   useEffect(() => {
     async function fetchCharity() {
-      // By ID or Slug depending on how schema is set up. Let's try ID first.
-      const { data } = await supabase
-        .from('charities')
-        .select('*')
-        .or(`id.eq.${slug},slug.eq.${slug}`)
-        .single()
-      
-      setCharity(data)
-      setLoading(false)
+      try {
+        const res = await fetch(`${API_URL}/api/charities/${encodeURIComponent(slug)}`)
+        if (res.ok) {
+          setCharity(await res.json())
+        } else {
+          setCharity(null)
+        }
+      } catch {
+        setCharity(null)
+      } finally {
+        setLoading(false)
+      }
     }
     fetchCharity()
   }, [slug])
